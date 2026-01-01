@@ -15,7 +15,7 @@ def main(cfg: omegaconf.DictConfig):
     start_time = time.time()
     ti_mem_fraction = 0.5
     ti.reset()
-    ti.init(arch=ti.gpu, device_memory_fraction=ti_mem_fraction, debug=True)
+    ti.init(arch=ti.cpu, device_memory_fraction=ti_mem_fraction, debug=True)
     save_dir = cfg['train_cfg']['save_dir']
     device = "cuda"
 
@@ -36,6 +36,9 @@ def main(cfg: omegaconf.DictConfig):
     particle_F = torch.zeros([1024, 4096, 3, 3], dtype=torch.float32).to(device)
     particle_Ftmp = torch.zeros([1024, 4096, 3, 3], dtype=torch.float32).to(device)
     particle_stress = torch.zeros([1024, 4096, 3, 3], dtype=torch.float32).to(device)
+    particle_material_id = torch.zeros([4096], dtype=torch.long).to(device)
+
+    mpmwrapper_gt.simulator.get_material_id(particle_material_id)
 
     # Simulation
     cfl_flag = False
@@ -73,6 +76,7 @@ def main(cfg: omegaconf.DictConfig):
             final_F = particle_F[:mpmwrapper_gt.num_particles[None], :(num_sim_steps * substep_gt + 2)][:, :]
             final_Ftmp = particle_Ftmp[:mpmwrapper_gt.num_particles[None], :(num_sim_steps * substep_gt + 2)]
             final_stress = particle_stress[:mpmwrapper_gt.num_particles[None], :(num_sim_steps * substep_gt + 2)][:, :]
+            final_material_id = particle_material_id[:mpmwrapper_gt.num_particles[None]]
 
             x_gt = final_x.permute(1, 0, 2)
             v_gt = final_v.permute(1, 0, 2)
@@ -87,6 +91,7 @@ def main(cfg: omegaconf.DictConfig):
             torch.save(F_gt, f"{save_path}/GtF.pt")
             torch.save(Ftmp_gt, f"{save_path}/GtFtmp.pt")
             torch.save(stress_gt, f"{save_path}/GtStress.pt")
+            torch.save(final_material_id.cpu(), f"{save_path}/MaterialID.pt")
 
         print (f"Simulated saved at {save_path}")
     else:
@@ -94,11 +99,3 @@ def main(cfg: omegaconf.DictConfig):
 
 if __name__=='__main__':
     main()
-
-
-
-
-
-
-
-

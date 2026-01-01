@@ -409,6 +409,11 @@ class MPMSimulator:
                 for j in ti.static(range(3)):
                     stress_t[p, step, i, j] = ti.cast(self.stress[p, step][i, j], ti.f32)  # self.F = 3 x 3
 
+    @ti.kernel
+    def get_material_id(self, material_id: ti.types.ndarray()):
+        for p in range(self.n_particles[None]):
+            material_id[p] = ti.cast(self.material[p], ti.i32)
+
     def advance(self, f):
         for i in range(self.n_substeps[None] * f, self.n_substeps[None] * (f+1)):
             if self.cfl_satisfy[None]:

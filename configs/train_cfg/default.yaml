@@ -1,7 +1,7 @@
 grogu: False
 lr: 0.1
-save_dir: None
-local_dir: None
+save_dir: save_dir
+local_dir: /home/simulation/thesis/UniPhy
 material_data: oracle_Data/elastic_torus_orig
 mu_init_val: 3.
 Fdet_reg: False
@@ -39,3 +39,6 @@ latent_init_config: None
 traj_latent_idx: None
 config_path: None
 eval_gt_nn_scenario: None
+n_hidden: [3, 2, 1]
+grid_range: [[-5.0, 25.0], [-5.0, 25.0], [-5.0, 25.0]]
+z_dim: 6

@@ -211,4 +211,4 @@ class MPMWrapper:
 
 if __name__=='__main__':
     ti.reset()
-    ti.init(arch=ti.gpu, device_memory_fraction=0.9)
+    ti.init(arch=ti.cpu, device_memory_fraction=0.9)

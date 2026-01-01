@@ -199,3 +199,13 @@ dmypy.json
 
 ## VS Code
 /.vscode
+
+# Dataset and weights files
+*.pt
+*.pth
+/gradio_demo/
+/data_process/outputs/
+/outputs/
+/None/
+/dataset/
+/save_dir/
