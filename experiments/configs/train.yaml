@@ -5,3 +5,5 @@ defaults:
   - override sim: low
   - override train: default
   - _self_
+
+name: dev

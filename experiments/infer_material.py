@@ -77,14 +77,14 @@ def main(cfg: DictConfig):
     elasticity_requires_grad = cfg.env.blob.material.elasticity.requires_grad
     plasticity_requires_grad = cfg.env.blob.material.plasticity.requires_grad
 
-    elasticity: nn.Module = getattr(nclaw.material, cfg.env.blob.material.elasticity.cls)(hidden_size=128, embed_dim=32, normalize_input=True)
+    elasticity: nn.Module = getattr(nclaw.material, cfg.env.blob.material.elasticity.cls)(cfg.env.blob.material.elasticity) #(hidden_size=128, embed_dim=32, normalize_input=True)
     elasticity.to(torch_device)
     if len(list(elasticity.parameters())) == 0:
         elasticity_requires_grad = False
     elasticity.requires_grad_(elasticity_requires_grad)
     elasticity.train(elasticity_requires_grad)
 
-    plasticity: nn.Module = getattr(nclaw.material, cfg.env.blob.material.plasticity.cls)(hidden_size=128, embed_dim=32, normalize_input=True, alpha=0.001)
+    plasticity: nn.Module = getattr(nclaw.material, cfg.env.blob.material.plasticity.cls)(cfg.env.blob.material.plasticity) #(hidden_size=128, embed_dim=32, normalize_input=True, alpha=0.001)
     plasticity.to(torch_device)
     if len(list(plasticity.parameters())) == 0:
         plasticity_requires_grad = False
@@ -92,8 +92,20 @@ def main(cfg: DictConfig):
     plasticity.train(plasticity_requires_grad)
 
     ckpt = torch.load(f'{ckpt_stage1_dir}/ckpt.pth', map_location=torch_device)
-    elasticity.load_state_dict(ckpt['stress_model_state_dict'])
-    plasticity.load_state_dict(ckpt['plasticity_model_state_dict'])
+    ckpt_stress = {
+        key.replace('module.stress_model.', '').replace('_stress', ''): value
+        for key, value in ckpt.items() if 'stress_model' in key
+    }
+    ckpt_plasticity = {
+        key.replace('module.fproj_model.', '').replace('_fproj', ''): value
+        for key, value in ckpt.items() if 'fproj_model' in key
+    }
+
+    elasticity.load_state_dict(ckpt_stress)
+    plasticity.load_state_dict(ckpt_plasticity)
+
+    # elasticity.load_state_dict(ckpt['stress_model_state_dict'])
+    # plasticity.load_state_dict(ckpt['plasticity_model_state_dict'])
 
     traj_path = f'{ckpt_stage1_dir}/traj_latent.pth'
     trajectory_latent_embedding_orig = torch.load(traj_path).weight.detach()

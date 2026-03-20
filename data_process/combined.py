@@ -5,7 +5,7 @@ import os
 current_path = os.getcwd()
 local_path = '/'.join(current_path.strip().split('/')[:-1])
 
-INTERACT = False
+INTERACT = True
 
 def falling_under_gravity(random_mu, random_lam, random_friction_alpha):
     for idx in range(len(random_mu)):
@@ -24,7 +24,7 @@ def falling_under_gravity(random_mu, random_lam, random_friction_alpha):
             f"train_cfg.cuda_chunk_size=4096 "
             f"train_cfg.particles_ti_root=1024 "
             f"train_cfg.local_dir={local_path} "
-            f"train_cfg.save_dir='dataset/combined_diverse/combined_falling_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
+            f"train_cfg.save_dir='dataset/interacting_diverse/diverse_falling_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
             f"objects.blobby.material.mu={random_mu[idx]} "
             f"objects.blobby.material.lam={random_lam[idx]} "
             f"objects.sphere.material.mu={random_mu[idx]} "
@@ -51,7 +51,7 @@ def horizontal_left(random_mu, random_lam, random_friction_alpha):
             f"train_cfg.cuda_chunk_size=4096 "
             f"train_cfg.particles_ti_root=1024 "
             f"train_cfg.local_dir={local_path} "
-            f"train_cfg.save_dir='dataset/combined_diverse/combined_horizontaleft_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
+            f"train_cfg.save_dir='dataset/interacting_diverse/diverse_horizontaleft_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
             f"objects.blobby.material.mu={random_mu[idx]} "
             f"objects.blobby.material.lam={random_lam[idx]} "
             f"objects.sphere.material.mu={random_mu[idx]} "
@@ -78,7 +78,7 @@ def horizontal_right(random_mu, random_lam, random_friction_alpha):
             f"train_cfg.cuda_chunk_size=4096 "
             f"train_cfg.particles_ti_root=1024 "
             f"train_cfg.local_dir={local_path} "
-            f"train_cfg.save_dir='dataset/combined_diverse/combined_horizontalright_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
+            f"train_cfg.save_dir='dataset/interacting_diverse/diverse_horizontalright_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
             f"objects.blobby.material.mu={random_mu[idx]} "
             f"objects.blobby.material.lam={random_lam[idx]} "
             f"objects.sphere.material.mu={random_mu[idx]} "
@@ -105,7 +105,7 @@ def diagonal_left(random_mu, random_lam, random_friction_alpha):
             f"train_cfg.cuda_chunk_size=4096 "
             f"train_cfg.particles_ti_root=1024 "
             f"train_cfg.local_dir={local_path} "
-            f"train_cfg.save_dir='dataset/combined_diverse/combined_diagonalleft_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
+            f"train_cfg.save_dir='dataset/interacting_diverse/diverse_diagonalleft_mu{random_mu[idx]}_lam{random_lam[idx]}_fa{random_friction_alpha[idx]}' "
             f"objects.blobby.material.mu={random_mu[idx]} "
             f"objects.blobby.material.lam={random_lam[idx]} "
             f"objects.sphere.material.mu={random_mu[idx]} "

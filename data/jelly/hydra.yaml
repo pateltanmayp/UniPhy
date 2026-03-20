@@ -1,0 +1,101 @@
+env:
+  blob:
+    bsdf_pcd:
+      type: diffuse
+      reflectance:
+        type: rgb
+        value:
+        - 0.92941176
+        - 0.32941176
+        - 0.23137255
+    material:
+      elasticity:
+        cls: CorotatedElasticity
+        E: 100000
+        nu: 0.2
+        requires_grad: false
+        random: false
+      plasticity:
+        E: 100000
+        cls: IdentityPlasticity
+        nu: 0.2
+        random: false
+        requires_grad: false
+      ckpt: null
+      name: jelly_100000_0.2
+    shape:
+      type: cube
+      name: dataset
+      center:
+      - 0.5
+      - 0.5
+      - 0.5
+      size:
+      - 0.5
+      - 0.5
+      - 0.5
+      resolution: 10
+      mode: uniform
+      sort: null
+    vel:
+      random: false
+      lin_vel:
+      - 1.0
+      - -1.5
+      - -2.0
+      ang_vel:
+      - 4.0
+      - 4.0
+      - 4.0
+    clip_bound: 0.5
+    name: jelly_100000_0.2
+    rho: 1000.0
+    span:
+    - 0
+    - 1000
+render:
+  spp: 32
+  width: 512
+  height: 512
+  skip_frame: 25
+  bound: 0.5
+  mpm_mul: 6
+  sph_version: cuda_ad_rgb
+  pcd_version: scalar_rgb
+  has_sphere_emitter: true
+  fps: 10
+sim:
+  quality: low
+  num_steps: 1000
+  gravity:
+  - 0.0
+  - -9.8
+  - 0.0
+  bc: freeslip
+  num_grids: 20
+  dt: 0.0005
+  bound: 3
+  eps: 1.0e-07
+  skip_frame: 1
+train:
+  teacher:
+    strategy: cosine
+    start_lambda: 25
+    end_lambda: 200
+  num_epochs: 300
+  batch_size: 128
+  elasticity_lr: 1.0
+  plasticity_lr: 0.1
+  elasticity_wd: 0.0
+  plasticity_wd: 0.0
+  elasticity_grad_max_norm: 0.1
+  plasticity_grad_max_norm: 0.1
+name: jelly_100000_0.2/dataset
+seed: 0
+cpu: 0
+num_cpus: 128
+gpu: 0
+overwrite: false
+resume: false
+gt_name: null
+dataset: true

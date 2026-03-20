@@ -174,7 +174,8 @@ def main(cfg: omegaconf.DictConfig):
     logger.addHandler(fh)
 
     ##### Load Dataset #####
-    traj_l = ["elastic_diverse", "newtonian_diverse", "non_newtonian_diverse", "plasticine_diverse", "sand_diverse"]
+    # traj_l = ["elastic_diverse", "newtonian_diverse", "non_newtonian_diverse", "plasticine_diverse", "sand_diverse"]
+    traj_l = ["elastic_diverse"]
     traj_dir_list = []
     for tl in traj_l:
         for _dir_idx, _dir in enumerate(os.listdir(os.path.join(f"{local_dir}/dataset/", tl))):

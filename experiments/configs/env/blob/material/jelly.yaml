@@ -4,6 +4,7 @@ defaults:
   - _self_
 
 name: jelly
-ckpt: null
+# ckpt: 'save_dir/elastic'
+ckpt: 'ckpt/pretrained_stress_fproj_models_latent_space'
 traj_dir: 'data/jelly'
 ckpt_latent: 'ckpt/jelly.pt'

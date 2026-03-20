@@ -1,6 +1,6 @@
 grogu: False
 lr: 0.1
-save_dir: save_dir
+save_dir: save_dir/elastic
 local_dir: /home/simulation/thesis/UniPhy
 material_data: oracle_Data/elastic_torus_orig
 mu_init_val: 3.
@@ -9,12 +9,12 @@ focal_loss: False
 grad_clip_val: False
 grad_clip_norm: False
 weight_decay: False
-nn_activation: 'elu'
+nn_activation: 'gelu'
 nn_init_weight: 'uniform_5'
 stress_loss: False
 Ftransform: 'F'
 Ftmptransform: 'F'
-batch_size: 160
+batch_size: 640
 load_model:
 lambda_lr_rate: 0.02
 hidden_size: 128
@@ -42,4 +42,5 @@ eval_gt_nn_scenario: None
 n_hidden: [3, 2, 1]
 grid_range: [[-5.0, 25.0], [-5.0, 25.0], [-5.0, 25.0]]
 z_dim: 6
+use_kan: False
 num_materials: 16

@@ -183,7 +183,7 @@ def main(cfg: omegaconf.DictConfig):
                             trajectory_latent=None).to(device)
 
     if cfg['train_cfg']['load_model']:
-        ckpt = torch.load(cfg['train_cfg']['load_model'])
+        ckpt = torch.load(os.path.join(local_dir, cfg['train_cfg']['load_model']))
         ckpt_stress = {key.replace('module.', '').replace('_stress', '').replace('stress_model.', ''): value for key, value in ckpt.items() if 'stress' in key}
         ckpt_fproj = {key.replace('module.', '').replace('_fproj', '').replace('fproj_model.', ''): value for key, value in ckpt.items() if 'fproj' in key}
         stress_model.load_state_dict(ckpt_stress)
@@ -193,14 +193,15 @@ def main(cfg: omegaconf.DictConfig):
     stress_model.eval()
 
     # Load trajectory data
-    traj_data_dir = cfg['train_cfg']['traj_data_dir']
+    traj_data_dir = os.path.join(local_dir, cfg['train_cfg']['traj_data_dir'])
     traj_data_orig = torch.load(os.path.join(traj_data_dir, 'GtX.pt'))
     traj_data_orig = torch.tensor(traj_data_orig).to(device) # T x P x 3
+    traj_data_orig = traj_data_orig[:100:2, :, :] # Subsample for faster inference
 
     traj_idx = 0
 
     ## Load the trajectory latent ##
-    latent_obj = Latent(device="cuda", traj_latent_path=cfg['train_cfg']['traj_latent_path'], embed_dim=cfg['train_cfg']['embed_dim'])
+    latent_obj = Latent(device="cuda", traj_latent_path=os.path.join(local_dir, cfg['train_cfg']['traj_latent_path']), embed_dim=cfg['train_cfg']['embed_dim'])
     latent_obj.train()
 
     fproj_model.trajectory_latent = latent_obj.trajectory_latent
@@ -216,6 +217,9 @@ def main(cfg: omegaconf.DictConfig):
     scheduler1 = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_lr_step_size, gamma=0.9)
 
     ti_mem_fraction = 0.7
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+    ti.reset()
     ti.reset()
     ti.init(arch=ti.gpu, device_memory_fraction=ti_mem_fraction, debug=True)
 
@@ -225,6 +229,7 @@ def main(cfg: omegaconf.DictConfig):
         # Load positions
         init_particles_simulator = traj_data_orig[0].contiguous()
         target_particles_simulator = traj_data_orig.permute(1, 0, 2).cpu().numpy()  # P x T x 3
+        print(init_particles_simulator.shape, target_particles_simulator.shape)
 
         # Assign the specific trajectory object's config
         cfg['objects'] = traj_cfg['objects']
