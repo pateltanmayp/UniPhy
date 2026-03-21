@@ -203,7 +203,8 @@ dmypy.json
 # Dataset and weights files
 *.pt
 *.pth
-/gradio_demo/
+/gradio_demo/gradio_demo_data/
+/gradio_demo/outputs/
 /data_process/outputs/
 /outputs/
 /None/
