@@ -77,25 +77,23 @@ class MPMSimulator:
                             self.material
                             )
 
-        grid_size = 4096
+        # Dense grid - no pointer SNnodes
+        grid_size = 128  # smaller since dense; adjust based on your simulation domain
         offset = self.offset = tuple(-grid_size // 2 for _ in range(3))
         self.offset_vec = ti.Vector(list(offset), ti.i32)
-        grid_block_size = 128
-        leaf_block_size = self.leaf_block_size = 4
-        
-        grid = self.grid = ti.root.pointer(ti.ijk, grid_size // grid_block_size)
-        block = self.block = grid.pointer(ti.ijk, grid_block_size // leaf_block_size)
+        self.leaf_block_size = 4
 
-        self.grid_m = ti.field(dtype=self.dtype)  # grid node mass
-        self.grid_v_in = ti.Vector.field(dim, dtype=self.dtype)  # grid node momentum/velocity
-        self.grid_v_out = ti.Vector.field(dim, dtype=self.dtype)  # grid node momentum/velocity
-       
-        def block_component(c):
-            block.dense(ti.ijk, leaf_block_size).place(c, c.grad, offset=offset)
+        self.grid_m = ti.field(dtype=self.dtype)
+        self.grid_v_in = ti.Vector.field(dim, dtype=self.dtype)
+        self.grid_v_out = ti.Vector.field(dim, dtype=self.dtype)
 
-        block_component(self.grid_m)
-        block_component(self.grid_v_in)
-        block_component(self.grid_v_out)
+        ti.root.dense(ti.ijk, grid_size).place(self.grid_m, self.grid_m.grad, offset=offset)
+        ti.root.dense(ti.ijk, grid_size).place(self.grid_v_in, self.grid_v_in.grad, offset=offset)
+        ti.root.dense(ti.ijk, grid_size).place(self.grid_v_out, self.grid_v_out.grad, offset=offset)
+
+        # Dummy references so rest of code doesn't break
+        self.grid = self.grid_m  # deactivate_all() calls will need to be removed
+        self.block = None
         
         self.gravity = ti.Vector.field(dim, self.dtype, shape=())# gravity ...
         self.gravity[None] = gravity
@@ -320,9 +318,19 @@ class MPMSimulator:
                 self.cfl_satisfy[None] = 0
                 print ("Cfl: v*dt > x")
 
+    @ti.kernel
+    def clear_grid(self):
+        for I in ti.grouped(self.grid_m):
+            self.grid_m[I] = 0.0
+            self.grid_v_in[I] = ti.Vector.zero(self.dtype, self.dim)
+            self.grid_v_out[I] = ti.Vector.zero(self.dtype, self.dim)
+            self.grid_m.grad[I] = 0.0
+            self.grid_v_in.grad[I] = ti.Vector.zero(self.dtype, self.dim)
+            self.grid_v_out.grad[I] = ti.Vector.zero(self.dtype, self.dim)
+
     def substep(self, s, cache=True):
         local_index = s % self.cuda_chunk_size
-        self.grid.deactivate_all()
+        self.clear_grid()
         self.compute_F_tmp(local_index)
         self.svd(local_index)
         self.project_F(local_index)
@@ -340,7 +348,7 @@ class MPMSimulator:
         if local_index == self.cuda_chunk_size-1:
             self.pop_from_memory()
 
-        self.grid.deactivate_all()
+        self.clear_grid()
         self.compute_F_tmp(local_index)
         self.svd(local_index)
         self.project_F(local_index)

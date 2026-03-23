@@ -59,7 +59,7 @@ class MultiMaterialLatent(torch.nn.Module):
 
         print("KMeans loading for multi-material latent initialisation …")
         trajectory_latent_embedding_orig = (
-            torch.load(traj_latent_path).weight.detach()
+            torch.load(traj_latent_path, weights_only=False).weight.detach()
         )
         kmeans = KMeans(n_clusters=kmeans_n_clusters, random_state=42)
         kmeans.fit(trajectory_latent_embedding_orig.cpu().numpy())
@@ -151,10 +151,10 @@ class FprojNN(torch.nn.Module):
     def forward(self, Ftmp, U, V, traj_id, particle_mat_ids=None):
         """
         Args:
-            Ftmp, U, V:        as before – shape (P, 3, 3)
+            Ftmp, U, V:        as before - shape (P, 3, 3)
             traj_id:           kept for API compatibility (ignored when
                                particle_mat_ids is provided)
-            particle_mat_ids:  LongTensor (P,) – material ID per particle.
+            particle_mat_ids:  LongTensor (P,) - material ID per particle.
                                When None, falls back to the single-material
                                behaviour using traj_id as the latent index.
         """
@@ -247,9 +247,9 @@ class StressNN(torch.nn.Module):
     def forward(self, F, C, traj_id, particle_mat_ids=None):
         """
         Args:
-            F, C:              as before – shape (P, 3, 3)
+            F, C:              as before - shape (P, 3, 3)
             traj_id:           kept for API compatibility
-            particle_mat_ids:  LongTensor (P,) – material ID per particle
+            particle_mat_ids:  LongTensor (P,) - material ID per particle
         """
         strain = self.FFt_logJ_sigma_J_logJ1_J1_transform(F)  # P x 16
 
@@ -277,6 +277,7 @@ class StressNN(torch.nn.Module):
 
         stress           = out.view(out.shape[0], 3, 3)
         stress_symmetric = 0.5 * (stress + stress.permute(0, 2, 1))
+        stress_symmetric = torch.clamp(stress_symmetric, -1e4, 1e4)
         return stress_symmetric
 
 
@@ -293,23 +294,31 @@ def load_particle_mat_ids(traj_data_dir: str, num_particles: int,
     Fallback: if the file is absent, all particles are assigned to material 0
     (i.e. the original single-material behaviour is preserved).
     """
-    id_path = os.path.join(traj_data_dir, 'particle_mat_ids.pt')
+    id_path = os.path.join(traj_data_dir, 'MaterialID.pt')
     if os.path.exists(id_path):
-        mat_ids = torch.load(id_path).long().to(device)
-        assert mat_ids.shape[0] == num_particles, (
-            f"particle_mat_ids.pt has {mat_ids.shape[0]} entries but "
+        mat_ids_raw = torch.load(id_path).long().to(device)
+        assert mat_ids_raw.shape[0] == num_particles, (
+            f"MaterialID.pt has {mat_ids_raw.shape[0]} entries but "
             f"the scene has {num_particles} particles."
         )
+        # Remap arbitrary material IDs to contiguous 0..n-1
+        unique_ids = mat_ids_raw.unique(sorted=True)
+        remap = {old_id.item(): new_id for new_id, old_id in enumerate(unique_ids)}
+        mat_ids = torch.tensor(
+            [remap[i.item()] for i in mat_ids_raw],
+            dtype=torch.long, device=device
+        )
         print(f"Loaded particle material IDs from {id_path}. "
-              f"Unique IDs: {mat_ids.unique().tolist()}")
+            f"Raw unique IDs: {unique_ids.tolist()} -> "
+            f"Remapped to: {list(remap.values())}")
     else:
-        print(f"Warning: {id_path} not found – all particles assigned to "
-              f"material 0 (single-material fallback).")
+        print(f"Warning: {id_path} not found - all particles assigned to "
+            f"material 0 (single-material fallback).")
         mat_ids = torch.zeros(num_particles, dtype=torch.long, device=device)
     return mat_ids
 
 
-@hydra.main(config_path='configs', config_name='default')
+@hydra.main(config_path='configs', config_name='infer')
 def main(cfg: omegaconf.DictConfig):
 
     ## Logging ##
@@ -353,7 +362,7 @@ def main(cfg: omegaconf.DictConfig):
     ).to(device)
 
     if cfg['train_cfg']['load_model']:
-        ckpt = torch.load(cfg['train_cfg']['load_model'])
+        ckpt = torch.load(os.path.join(local_dir, cfg['train_cfg']['load_model']))
         ckpt_stress = {
             key.replace('module.', '')
                .replace('_stress', '')
@@ -373,7 +382,7 @@ def main(cfg: omegaconf.DictConfig):
     stress_model.eval()
 
     # Load trajectory data
-    traj_data_dir  = cfg['train_cfg']['traj_data_dir']
+    traj_data_dir  = os.path.join(local_dir, cfg['train_cfg']['traj_data_dir'])
     traj_data_orig = torch.load(os.path.join(traj_data_dir, 'GtX.pt'))
     traj_data_orig = torch.tensor(traj_data_orig).to(device)  # T x P x 3
 
@@ -385,7 +394,7 @@ def main(cfg: omegaconf.DictConfig):
         traj_data_dir, num_particles, device
     )
     # Infer num_materials from data if not explicitly given in config
-    inferred_num_mats = int(particle_mat_ids.max().item()) + 1
+    inferred_num_mats = len(particle_mat_ids.unique())
     if inferred_num_mats > num_materials:
         print(f"  Config num_materials={num_materials} < inferred "
               f"{inferred_num_mats}; using inferred value.")
@@ -394,7 +403,7 @@ def main(cfg: omegaconf.DictConfig):
     ## Build multi-material latent module ##
     latent_obj = MultiMaterialLatent(
         device="cuda",
-        traj_latent_path=cfg['train_cfg']['traj_latent_path'],
+        traj_latent_path=os.path.join(local_dir, cfg['train_cfg']['traj_latent_path']),
         embed_dim=cfg['train_cfg']['embed_dim'],
         num_materials=num_materials,
     )

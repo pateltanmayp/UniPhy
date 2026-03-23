@@ -107,4 +107,4 @@ with gr.Blocks() as demo:
     
     btn.click(fn=render_point_cloud_simulation, inputs=[material_dd, geometry_dd], outputs=out_gif)
 
-demo.launch()
+demo.launch(share=True)

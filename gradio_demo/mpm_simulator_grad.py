@@ -169,7 +169,11 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
 
         # U_p_torch[0] @ sigma_p_torch[0] @ V_p_torch[0].T
         self.get_latent(self.traj_latent)
-        self.fproj_model.trajectory_latent.from_pretrained(self.traj_latent)
+        if False: # TODO: fix
+            self.fproj_model.trajectory_latent.from_pretrained(self.traj_latent)
+        else:
+            for i in range(len(self.fproj_model.trajectory_latents)):
+                self.fproj_model.trajectory_latents[i].from_pretrained(self.traj_latent)
         Fproj_torch = self.fproj_model(Ftmp_p_torch, U_p_torch, V_p_torch, traj_id)
         # loss_mse = torch.nn.MSELoss()
         # cur_loss = loss_mse(Ftmp_p_torch, Fproj_torch)
@@ -192,7 +196,11 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
         C_p_torch.requires_grad_(True)
 
         self.get_latent(self.traj_latent)
-        self.stress_model.trajectory_latent.from_pretrained(self.traj_latent)
+        if False: # TODO: fix
+            self.stress_model.trajectory_latent.from_pretrained(self.traj_latent)
+        else:
+            for i in range(len(self.stress_model.trajectory_latents)):
+                self.stress_model.trajectory_latents[i].from_pretrained(self.traj_latent)
         stress_torch = self.stress_model(F_p_torch, C_p_torch, traj_id)
         # stress_torch = torch.clamp(stress_torch, -511906.5312, 358896.1562)
 
@@ -225,7 +233,7 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
                             weight * (self.p_mass[p] * self.v[p, s] + affine @ dpos)
                         self.grid_m[base + offset] += weight * self.p_mass[p]
 
-    def advance_F_stress(self, t, traj_id):
+    def advance_F_stress(self, t, traj_id, particle_mat_ids=None):
         if self.cfl_satisfy[None]:
             self.substep_F_stress(t, traj_id, cache=True)
 
@@ -302,7 +310,11 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
         V_p_torch.requires_grad_(True)
 
         self.get_latent(self.traj_latent)
-        self.fproj_model.trajectory_latent.from_pretrained(self.traj_latent)
+        if False: # TODO: fix
+            self.fproj_model.trajectory_latent.from_pretrained(self.traj_latent)
+        else:
+            for i in range(len(self.fproj_model.trajectory_latents)):
+                self.fproj_model.trajectory_latents[i].from_pretrained(self.traj_latent)
 
         Fproj_torch = self.fproj_model(Ftmp_p_torch, U_p_torch, V_p_torch, traj_id)
 
@@ -327,7 +339,11 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
 
         # traj_latent_torch = self.traj_latent
         self.get_latent(self.traj_latent)  # transfers latent from traj_latent_ti to self.traj_latent torch
-        self.stress_model.trajectory_latent.from_pretrained(self.traj_latent)
+        if False: # TODO: fix
+            self.stress_model.trajectory_latent.from_pretrained(self.traj_latent)
+        else:
+            for i in range(len(self.stress_model.trajectory_latents)):
+                self.stress_model.trajectory_latents[i].from_pretrained(self.traj_latent)
 
         C_p_torch = self.C_substep[:self.n_particles[None], t, :, :]
         C_p_torch.requires_grad_(True)
@@ -347,7 +363,7 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
         # self.get_traj_latent_grad(self.traj_latent_grad)
         # traj_latent_torch.backward(gradient=traj_latent_torch.grad)
 
-    def advance_grad_F_stress(self, f, traj_id):
+    def advance_grad_F_stress(self, f, traj_id, particle_mat_ids=None):
         # import ipdb; ipdb.set_trace()
         for i in reversed(range(self.n_substeps[None] * f, self.n_substeps[None] * (f+1))):
             if self.cfl_satisfy[None]:

@@ -15,9 +15,9 @@ def main(cfg: omegaconf.DictConfig):
     start_time = time.time()
     ti_mem_fraction = 0.5
     ti.reset()
-    ti.init(arch=ti.cpu, device_memory_fraction=ti_mem_fraction, debug=True)
+    ti.init(arch=ti.cpu)
     save_dir = cfg['train_cfg']['save_dir']
-    device = "cuda"
+    device = "cpu"
 
     num_sim_steps = cfg['visualization_cfg']['num_frames']
     cuda_chunk_size = cfg['train_cfg']['cuda_chunk_size']

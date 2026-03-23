@@ -40,7 +40,7 @@ class Latent(torch.nn.Module):
 
         print ("kmeans loading")
         traj_path = self.traj_latent_path
-        trajectory_latent_embedding_orig = torch.load(traj_path).weight.detach()
+        trajectory_latent_embedding_orig = torch.load(traj_path, weights_only=False).weight.detach()
         kmeans = KMeans(n_clusters=8, random_state=42)
         kmeans.fit(trajectory_latent_embedding_orig.cpu().numpy())
         centroids = kmeans.cluster_centers_[2]
@@ -147,7 +147,7 @@ class StressNN(torch.nn.Module):
 
         return stress_symmetric
 
-@hydra.main(config_path='configs', config_name='default')
+@hydra.main(config_path='configs', config_name='infer')
 def main(cfg: omegaconf.DictConfig):
 
     ## Logging ##
@@ -196,7 +196,7 @@ def main(cfg: omegaconf.DictConfig):
     traj_data_dir = os.path.join(local_dir, cfg['train_cfg']['traj_data_dir'])
     traj_data_orig = torch.load(os.path.join(traj_data_dir, 'GtX.pt'))
     traj_data_orig = torch.tensor(traj_data_orig).to(device) # T x P x 3
-    traj_data_orig = traj_data_orig[:100:2, :, :] # Subsample for faster inference
+    # traj_data_orig = traj_data_orig[:100:2, :, :] # Subsample for faster inference
 
     traj_idx = 0
 
@@ -283,6 +283,13 @@ def main(cfg: omegaconf.DictConfig):
             mpmwrapper_learnable.simulator.advance_grad_F_stress(num_sim_steps - k - 1, traj_id=traj_idx)  # 9th steps
 
         optimizer.step()
+
+        latent_save_dir = os.path.join(local_dir, save_dir, "latents")
+        os.makedirs(latent_save_dir, exist_ok=True)
+        torch.save(
+            latent_obj.trajectory_latent,
+            os.path.join(latent_save_dir, f"latent_epoch_{epoch}.pt")
+        )
 
         mpmwrapper_learnable.simulator.loss[None] = 0.
         mpmwrapper_learnable.clear_grads()

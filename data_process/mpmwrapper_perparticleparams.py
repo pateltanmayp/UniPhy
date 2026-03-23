@@ -85,13 +85,13 @@ class MPMWrapper:
         all_points = []
         sample_idx = None
         for i in range(14):
-            cur_particles = torch.Tensor(open3d.io.read_point_cloud(f'{path}/{i}.ply').points).to('cuda')
+            cur_particles = torch.Tensor(open3d.io.read_point_cloud(f'{path}/{i}.ply').points) #.to('cuda')
             if sample_idx is None:
                 sample_idx = np.random.choice(cur_particles.shape[0], num_points)
             cur_particles = cur_particles[sample_idx]
             all_points.append(cur_particles)
 
-        all_points = torch.stack(all_points).to('cuda')
+        all_points = torch.stack(all_points) #.to('cuda')
         print("Loaded internal filled points from: ", path)
         return all_points
 
@@ -170,13 +170,13 @@ class MPMWrapper:
             self.simulator.p_mass[p] = self.particle_rho[p] * self.simulator.p_vol[None]
 
     def simulator_variables_initialize(self):
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
         ti.sync()
         # self.device = self.init_particles.device
         self.num_particles[None] = self.init_particles.shape[0]
         self.dx[None], self.inv_dx[None] = 0.02, 50
         self.simulator.p_vol[None] = (self.dx[None] * 0.5) ** 3
-        self.simulator.cached_states.clear()
+        # self.simulator.cached_states.clear()
         self.from_torch(self.init_particles,
                         self.init_velocities,
                         self.init_rhos,

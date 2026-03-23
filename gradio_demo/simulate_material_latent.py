@@ -36,7 +36,7 @@ class Latent(torch.nn.Module):
         self.embed_dim = embed_dim
 
         traj_path = self.traj_latent_path
-        trajectory_latent_embedding_orig = torch.load(traj_path).weight.detach()
+        trajectory_latent_embedding_orig = torch.load(traj_path, weights_only=False).weight.detach()
         trajectory_latent_embedding = torch.Tensor(trajectory_latent_embedding_orig)
         self.trajectory_latent = torch.nn.Embedding.from_pretrained(trajectory_latent_embedding, freeze=False).to(device)
 
@@ -140,7 +140,7 @@ class StressNN(torch.nn.Module):
 
         return stress_symmetric
 
-@hydra.main(config_path='configs', config_name='default')
+@hydra.main(config_path='configs', config_name='sim')
 def main(cfg: omegaconf.DictConfig):
 
     ## Logging ##
@@ -176,7 +176,7 @@ def main(cfg: omegaconf.DictConfig):
                             trajectory_latent=None).to(device)
 
     if cfg['train_cfg']['load_model']:
-        ckpt = torch.load(cfg['train_cfg']['load_model'])
+        ckpt = torch.load(os.path.join(local_dir, cfg['train_cfg']['load_model']))
         ckpt_stress = {key.replace('module.', '').replace('_stress', '').replace('stress_model.', ''): value for key, value in ckpt.items() if 'stress' in key}
         ckpt_fproj = {key.replace('module.', '').replace('_fproj', '').replace('fproj_model.', ''): value for key, value in ckpt.items() if 'fproj' in key}
         stress_model.load_state_dict(ckpt_stress)
@@ -186,14 +186,14 @@ def main(cfg: omegaconf.DictConfig):
     stress_model.eval()
 
     # Load trajectory data
-    traj_data_dir = cfg['train_cfg']['traj_data_dir']
+    traj_data_dir = os.path.join(local_dir, cfg['train_cfg']['traj_data_dir'])
     traj_data_orig = torch.load(os.path.join(traj_data_dir, 'GtX.pt'))
     traj_data_orig = torch.tensor(traj_data_orig).to(device) # T x P x 3
 
     traj_idx = 0
 
     ## Load the trajectory latent ##
-    latent_obj = Latent(device="cuda", traj_latent_path=cfg['train_cfg']['traj_latent_path'], embed_dim=cfg['train_cfg']['embed_dim'])
+    latent_obj = Latent(device="cuda", traj_latent_path=os.path.join(local_dir, cfg['train_cfg']['traj_latent_path']), embed_dim=cfg['train_cfg']['embed_dim'])
     latent_obj.train()
 
     fproj_model.trajectory_latent = latent_obj.trajectory_latent
@@ -253,6 +253,13 @@ def main(cfg: omegaconf.DictConfig):
 
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
+
+    gui = ti.GUI("MPM", (800, 800))
+
+    for t in range(pred_x_all_steps.shape[0]):
+        pts = pred_x_all_steps[t][:, :2]  # 2D projection
+        gui.circles(pts, radius=1)
+        gui.show()
 
     if cfg['train_cfg']['hou_vis']:
         visualize_simulation(trajectory=pred_x_all_steps)
