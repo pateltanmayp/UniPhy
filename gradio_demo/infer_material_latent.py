@@ -196,7 +196,6 @@ def main(cfg: omegaconf.DictConfig):
     traj_data_dir = os.path.join(local_dir, cfg['train_cfg']['traj_data_dir'])
     traj_data_orig = torch.load(os.path.join(traj_data_dir, 'GtX.pt'))
     traj_data_orig = torch.tensor(traj_data_orig).to(device) # T x P x 3
-    # traj_data_orig = traj_data_orig[:100:2, :, :] # Subsample for faster inference
 
     traj_idx = 0
 

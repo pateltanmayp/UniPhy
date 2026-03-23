@@ -11,9 +11,9 @@ embed_dim: 1024
 load_model: ckpt/pretrained_stress_fproj_models_latent_space/ckpt.pth
 traj_latent_path: ckpt/pretrained_stress_fproj_models_latent_space/traj_latent.pth
 batch_size: 32
-lr: 1e-3
+lr: 2e-3
 step_lr_step_size: 10000
-epochs: 100
+epochs: 250
 gt_X_file: None
 fproj_load_model: None
 latent_init_config: None

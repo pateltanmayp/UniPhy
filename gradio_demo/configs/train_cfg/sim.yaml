@@ -1,5 +1,5 @@
 cuda_chunk_size: 2900
-particles_ti_root: 500
+particles_ti_root: 1000
 save_dir: save_dir/dev
 local_dir: /home/tanmay/thesis/UniPhy
 dataset_dir: oracle_Data/elastic_torus_orig
@@ -9,11 +9,11 @@ nn_activation: gelu
 hidden_size: 4096
 embed_dim: 1024
 load_model: ckpt/pretrained_stress_fproj_models_latent_space/ckpt.pth
-traj_latent_path: save_dir/dev/latents/latent_epoch_10.pt
+traj_latent_path: save_dir/dev/latents_multi_material/latent_epoch_249.pt
 batch_size: 32
-lr: 1e-4
+lr: 2e-3
 step_lr_step_size: 10000
-epochs: 100
+epochs: 250
 gt_X_file: None
 fproj_load_model: None
 latent_init_config: None
@@ -24,4 +24,4 @@ wandb_name: particle_pos_loss
 latent_idx: None
 traj_latent_idx: None
 hou_vis: False
-traj_data_dir: dataset/elastic_diverse/elastic_blobby_diagonalleft_mu1255.1424802071363_lam1235.7978230999856
+traj_data_dir: dataset/combined_diverse/diverse_diagonalleft_mu585638.1896280601_lam765292.2885037105_fa0.1530207423022801

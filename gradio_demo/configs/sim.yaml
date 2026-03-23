@@ -1,5 +1,5 @@
 defaults:
-  - objects: torus
+  - objects: [blobby, sphere]
   - simulator_cfg: default
   - visualization_cfg: default
   - houdini: default

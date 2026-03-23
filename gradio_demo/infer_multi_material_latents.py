@@ -432,14 +432,14 @@ def main(cfg: omegaconf.DictConfig):
     ti.reset()
     ti.init(arch=ti.gpu, device_memory_fraction=ti_mem_fraction, debug=True)
 
+    # Load positions
+    init_particles_simulator = traj_data_orig[0].contiguous()
+    target_particles_simulator = (
+        traj_data_orig.permute(1, 0, 2).cpu().numpy()   # P x T x 3
+    )
+
     total_epochs = cfg['train_cfg']['epochs']
     for epoch in range(total_epochs):
-
-        # Load positions
-        init_particles_simulator   = traj_data_orig[0].contiguous()
-        target_particles_simulator = (
-            traj_data_orig.permute(1, 0, 2).cpu().numpy()   # P x T x 3
-        )
 
         # Assign the specific trajectory object's config
         cfg['objects'] = traj_cfg['objects']
@@ -515,6 +515,15 @@ def main(cfg: omegaconf.DictConfig):
             )
 
         optimizer.step()
+        optimizer.zero_grad()
+
+        latent_save_dir = os.path.join(local_dir, save_dir, "latents_multi_material")
+        os.makedirs(latent_save_dir, exist_ok=True)
+        torch.save(
+            {f"material_{mat_id}": latent_obj.trajectory_latents[mat_id]
+            for mat_id in range(num_materials)},
+            os.path.join(latent_save_dir, f"latent_epoch_{epoch}.pt")
+        )
 
         mpmwrapper_learnable.simulator.loss[None] = 0.
         mpmwrapper_learnable.clear_grads()
@@ -532,6 +541,10 @@ def main(cfg: omegaconf.DictConfig):
             )
             print(f"  Material {mat_id} latent norm: {lat_norm:.4f}")
 
+        del mpmwrapper_learnable
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        import gc; gc.collect()
         ti.reset()
         ti.init(arch=ti.gpu, device_memory_fraction=ti_mem_fraction,
                 debug=True)

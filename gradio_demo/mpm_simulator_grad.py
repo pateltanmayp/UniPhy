@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import os
 from mpm_simulator_learnable_grad import MPMSimulatorLearnableGrad
@@ -14,6 +15,7 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
                  constitutive_function, stress_model, particles_ti_root, tb_writer, stress_gt, device, embed_dim, fproj_model, **kwargs):
         super().__init__(dtype, dt, frame_dt, particle_layout, dx, inv_dx, n_particles, gravity, material, cuda_chunk_size, **kwargs)
 
+        self.multi_material = len(np.unique(material)) > 1
         self.constitutive_function = constitutive_function
         self.stress_model = stress_model
         self.flatten = Rearrange('b d1 d2 -> b (d1 d2)', d1=3, d2=3)
@@ -169,7 +171,7 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
 
         # U_p_torch[0] @ sigma_p_torch[0] @ V_p_torch[0].T
         self.get_latent(self.traj_latent)
-        if False: # TODO: fix
+        if not self.multi_material:
             self.fproj_model.trajectory_latent.from_pretrained(self.traj_latent)
         else:
             for i in range(len(self.fproj_model.trajectory_latents)):
@@ -196,7 +198,7 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
         C_p_torch.requires_grad_(True)
 
         self.get_latent(self.traj_latent)
-        if False: # TODO: fix
+        if not self.multi_material:
             self.stress_model.trajectory_latent.from_pretrained(self.traj_latent)
         else:
             for i in range(len(self.stress_model.trajectory_latents)):
@@ -310,7 +312,7 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
         V_p_torch.requires_grad_(True)
 
         self.get_latent(self.traj_latent)
-        if False: # TODO: fix
+        if not self.multi_material:
             self.fproj_model.trajectory_latent.from_pretrained(self.traj_latent)
         else:
             for i in range(len(self.fproj_model.trajectory_latents)):
@@ -339,7 +341,7 @@ class MPMSimulatorConstitutive(MPMSimulatorLearnableGrad):
 
         # traj_latent_torch = self.traj_latent
         self.get_latent(self.traj_latent)  # transfers latent from traj_latent_ti to self.traj_latent torch
-        if False: # TODO: fix
+        if not self.multi_material:
             self.stress_model.trajectory_latent.from_pretrained(self.traj_latent)
         else:
             for i in range(len(self.stress_model.trajectory_latents)):
