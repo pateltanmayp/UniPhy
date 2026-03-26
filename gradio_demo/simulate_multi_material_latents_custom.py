@@ -13,12 +13,17 @@ from mpmwrapper import MPMWrapperLearnableStress
 import taichi as ti
 import random
 import matplotlib.pyplot as plt
-
 from houdini_visualization_gradio import visualize_simulation
 
-PLOT_ERRORS = True
-SIM_MATERIALS_SEPARATELY = False
-SIM_MATERIALS_TOGETHER = False
+try:
+    sys.path.insert(0, "/home/tanmay/thesis/ICKANs/")
+    from core import *
+    import drivers.config as c
+    from ickan import *
+    KAN_AVAILABLE = True
+except ImportError:
+    KAN_AVAILABLE = False
+    print("Warning: KAN not available, falling back to MLP stress model.")
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -38,6 +43,7 @@ class FprojNN(torch.nn.Module):
     def __init__(self, activation, hidden_size, device, embed_dim,
                  trajectory_latents):
         super(FprojNN, self).__init__()
+        hidden_size = hidden_size
         self.device = device
 
         if activation == "gelu":
@@ -46,33 +52,47 @@ class FprojNN(torch.nn.Module):
         self.flatten = Rearrange('b d1 d2 -> b (d1 d2)', d1=3, d2=3)
         self.device = "cuda"
 
-        self.fc1 = nn.Linear(27 + embed_dim, hidden_size, bias=True)
+        # TODO: remove extra +3 AND extra layers
+        self.fc1 = nn.Linear(27 + 3 + embed_dim, hidden_size, bias=True)
         self.fc2 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc3 = nn.Linear(hidden_size, 9, bias=True)
+        self.fc3 = nn.Linear(hidden_size, hidden_size, bias=True)
+        self.fc4 = nn.Linear(hidden_size, hidden_size, bias=True)
+        self.fc5 = nn.Linear(hidden_size, 9, bias=True)
 
+        # trajectory_latents is now a nn.ModuleList (or None before wiring)
         self.trajectory_latents = trajectory_latents
 
+    # TODO: remove sigma stuff
     def Ftmp_U_Vt_transform(self, Ftmp, U, V):
         if (len((torch.isnan(Ftmp) == True).nonzero()) > 0 or
                 len((torch.isinf(Ftmp) == True).nonzero()) > 0):
             import ipdb; ipdb.set_trace()
 
-        U_flatten    = self.flatten(U)
-        Vt_flatten   = self.flatten(V.transpose(1, 2))
-        Ftmp_flatten = self.flatten(Ftmp)
-        Ftmp_input   = torch.cat([Ftmp_flatten, U_flatten, Vt_flatten], dim=-1)
+        _, sigma, _ = torch.linalg.svd(Ftmp)
+        U_flatten   = self.flatten(U)                       # P x 9
+        Vt_flatten  = self.flatten(V.transpose(1, 2))       # P x 9
+        Ftmp_flatten = self.flatten(Ftmp)                   # P x 9
+        Ftmp_input  = torch.cat(
+            [Ftmp_flatten, U_flatten, sigma, Vt_flatten], dim=-1  # P x 27
+        )
         return Ftmp_input
 
     def _build_latent_tensor(self, num_particles, particle_mat_ids):
+        """
+        Build a (P, embed_dim) tensor by gathering each particle's
+        material latent according to particle_mat_ids (LongTensor of
+        shape (P,) with values in [0, num_materials)).
+        """
         parts = []
         for mat_id in range(len(self.trajectory_latents)):
-            mask = (particle_mat_ids == mat_id)
+            mask = (particle_mat_ids == mat_id)          # (P,) bool
             if not mask.any():
                 continue
             n = mask.sum().item()
-            latent = self.trajectory_latents[mat_id].weight
+            latent = self.trajectory_latents[mat_id].weight  # (1, D)
             parts.append((mask, latent.expand(n, -1)))
 
+        # Allocate output and scatter
         embed_dim = self.trajectory_latents[0].weight.shape[-1]
         out = torch.zeros(num_particles, embed_dim,
                           device=particle_mat_ids.device,
@@ -82,65 +102,160 @@ class FprojNN(torch.nn.Module):
         return out
 
     def forward(self, Ftmp, U, V, traj_id, particle_mat_ids=None):
-        Ftmp_flatten = self.Ftmp_U_Vt_transform(Ftmp, U, V)
+        """
+        Args:
+            Ftmp, U, V:        as before - shape (P, 3, 3)
+            traj_id:           kept for API compatibility (ignored when
+                               particle_mat_ids is provided)
+            particle_mat_ids:  LongTensor (P,) - material ID per particle.
+                               When None, falls back to the single-material
+                               behaviour using traj_id as the latent index.
+        """
+        Ftmp_flatten = self.Ftmp_U_Vt_transform(Ftmp, U, V)   # P x 27
 
         if particle_mat_ids is not None:
             latent_particles = self._build_latent_tensor(
                 Ftmp.shape[0], particle_mat_ids
-            )
+            )                                                  # P x D
         else:
+            # Legacy single-material path
             latent_particles = (
                 self.trajectory_latents[0].weight[traj_id]
                     .unsqueeze(0)
                     .repeat(Ftmp.shape[0], 1)
             )
 
-        x   = self.activation(self.fc1(torch.cat([Ftmp_flatten, latent_particles], dim=-1)))
+        # TODO: remove extra layers
+        x = self.activation(
+            self.fc1(torch.cat([Ftmp_flatten, latent_particles], dim=-1))
+        )
         x   = self.activation(self.fc2(x))
-        out = self.fc3(x)
+        x   = self.activation(self.fc3(x))
+        x   = self.activation(self.fc4(x))
+        out = self.fc5(x)
 
         Fproj = Ftmp + out.view(out.shape[0], 3, 3)
         return Fproj
 
 
-class StressNN(torch.nn.Module):
-    def __init__(self, activation, hidden_size, embed_dim, device,
-                 trajectory_latents):
-        super(StressNN, self).__init__()
-        self.device = device
-
-        if activation == "gelu":
-            self.activation = torch.nn.GELU()
-
-        self.flatten = Rearrange('b d1 d2 -> b (d1 d2)', d1=3, d2=3)
-        self.device = "cuda"
-
-        self.fc1 = nn.Linear(16 + 9 + embed_dim, hidden_size, bias=True)
-        self.fc2 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc3 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc4 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc5 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc6 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc7 = nn.Linear(hidden_size, 9, bias=True)
-
-        self.trajectory_latents = trajectory_latents
-
-    def FFt_logJ_sigma_J_logJ1_J1_transform(self, F):
-        Ft  = F.transpose(1, 2)
-        FFt = torch.matmul(F, Ft)
-
-        J  = torch.max(torch.det(F[:, :, :]), torch.Tensor([1e-6]).cuda())
-        J1 = torch.max(F[:, 0, 0], torch.Tensor([1e-6]).cuda())
-
-        _, sigma, _ = torch.svd(F)
-        FFt_flatten  = self.flatten(FFt)
-        J            = J.unsqueeze(-1)
-        J1           = J1.unsqueeze(-1)
-
-        strain = torch.cat(
-            [FFt_flatten, torch.log(J), sigma, J, torch.log(J1), J1], dim=-1
+class MaterialHyperNet(nn.Module):
+    def __init__(self, z_dim, out_dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(z_dim, 32),
+            nn.SiLU(),
+            nn.Linear(32, out_dim),
+            nn.Softplus()
         )
-        return strain
+
+    def forward(self, z):
+        return self.net(z)
+
+
+class BranchingConstitutiveStress(nn.Module):
+    def __init__(self, hidden_size, embed_dim, n_hidden=None,
+                 grid_range=None, use_kan=True, seed=0):
+        super().__init__()
+        self.use_kan = use_kan
+        self.embed_dim = embed_dim
+
+        if use_kan:
+            assert KAN_AVAILABLE, "KAN requested but not importable."
+            assert n_hidden is not None and grid_range is not None
+            self.elastic_nn = KAN(
+                width=n_hidden, grid=c.grid, k=c.spline_order,
+                seed=seed, device='cuda', base_fun='zero', grid_eps=1.0,
+                grid_range_0=grid_range, sp_trainable=c.sp_trainable,
+                sb_trainable=c.sb_trainable,
+                symbolic_enabled=c.symbolic_enabled,
+                auto_save=False
+            )
+        else:
+            self.elastic_nn = nn.Sequential(
+                nn.Linear(3, hidden_size),
+                nn.SiLU(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.SiLU(),
+                nn.Linear(hidden_size, 1),
+                nn.Softplus()
+            )
+
+        self.elastic_scale = MaterialHyperNet(embed_dim, out_dim=1)
+        self.plastic_gate = nn.Sequential(
+            nn.Linear(embed_dim, hidden_size // 4),
+            nn.SiLU(),
+            nn.Linear(hidden_size // 4, 1),
+            nn.Sigmoid()
+        )
+        self.branch_weights = nn.Sequential(
+            nn.Linear(embed_dim, 2),
+            nn.Softplus()
+        )
+
+    def compute_invariants(self, F_flat):
+        F_flat = torch.clamp(F_flat, min=-5.0, max=5.0)
+        F00 = F_flat[:, 0:1]
+        F01 = F_flat[:, 1:2]
+        F10 = F_flat[:, 3:4]
+        F11 = F_flat[:, 4:5]
+        C00 = F00**2 + F10**2
+        C01 = F00*F01 + F10*F11
+        C11 = F01**2 + F11**2
+        I1 = C00 + C11 + 1.0
+        I3 = C00*C11 - C01**2
+        I3_safe = torch.clamp(I3, min=1e-6)
+        J  = torch.sqrt(I3_safe)
+        K1 = I1 * torch.pow(I3_safe, -1.0/3.0) - 3.0
+        K2 = torch.pow(
+            (I1 + I3_safe - 1.0) * torch.pow(I3_safe, -2.0/3.0), 1.5
+        ) - 3.0 * (3.0 ** 0.5)
+        K3 = (J - 1.0)**2
+        return torch.cat([K1, K2, K3], dim=1) #.double()
+
+    def forward(self, F_flat, z):
+        K = self.compute_invariants(F_flat)
+        W_elastic      = self.elastic_nn(K)
+        elastic_scale  = self.elastic_scale(z)
+        W_elastic      = elastic_scale * W_elastic
+        plastic_factor = self.plastic_gate(z)
+        W_plastic      = plastic_factor * W_elastic.detach()
+        weights = self.branch_weights(z)
+        alpha   = weights / weights.sum(dim=1, keepdim=True)
+        W = alpha[:, 0:1] * W_elastic + alpha[:, 1:2] * W_plastic
+
+        create_graph = torch.is_grad_enabled()
+        P_flat = torch.autograd.grad(
+            W.sum(), F_flat,
+            create_graph=create_graph,
+            retain_graph=True,
+        )[0]
+
+        stress = P_flat.view(-1, 3, 3)
+        stress_symmetric = 0.5 * (stress + stress.permute(0, 2, 1))
+        stress_symmetric = torch.clamp(stress_symmetric, -1e4, 1e4)
+        return stress_symmetric
+
+class StressNN(nn.Module):
+    """
+    Drop-in replacement for the old StressNN.
+    Wraps BranchingConstitutiveStress and exposes the same interface
+    (including trajectory_latents and _build_latent_tensor) so the
+    rest of the infer script needs no changes.
+    """
+    def __init__(self, hidden_size, embed_dim, device,
+                 trajectory_latents, use_kan=False,
+                 n_hidden=None, grid_range=None, seed=0):
+        super().__init__()
+        self.flatten = Rearrange('b d1 d2 -> b (d1 d2)', d1=3, d2=3)
+        self.trajectory_latents = trajectory_latents
+        self.stress_model = BranchingConstitutiveStress(
+            hidden_size=hidden_size,
+            embed_dim=embed_dim,
+            n_hidden=n_hidden,
+            grid_range=grid_range,
+            use_kan=use_kan,
+            seed=seed,
+        )
 
     def _build_latent_tensor(self, num_particles, particle_mat_ids):
         parts = []
@@ -161,8 +276,6 @@ class StressNN(torch.nn.Module):
         return out
 
     def forward(self, F, C, traj_id, particle_mat_ids=None):
-        strain = self.FFt_logJ_sigma_J_logJ1_J1_transform(F)
-
         if particle_mat_ids is not None:
             latent_particles = self._build_latent_tensor(
                 F.shape[0], particle_mat_ids
@@ -174,19 +287,14 @@ class StressNN(torch.nn.Module):
                     .repeat(F.shape[0], 1)
             )
 
-        C_flatten = self.flatten(C)
-        x   = self.activation(self.fc1(torch.cat([strain, C_flatten, latent_particles], dim=-1)))
-        x   = self.activation(self.fc2(x))
-        x   = self.activation(self.fc3(x))
-        x   = self.activation(self.fc4(x))
-        x   = self.activation(self.fc5(x))
-        x   = self.activation(self.fc6(x))
-        out = self.fc7(x)
+        # enable_grad is needed because BranchingConstitutiveStress computes
+        # stress as dW/dF via autograd.grad, which requires a graph even
+        # during inference (which runs inside torch.no_grad())
+        with torch.enable_grad():
+            F_flat = self.flatten(F).float().requires_grad_(True)
+            stress_symmetric = self.stress_model(F_flat, latent_particles)
 
-        stress           = out.view(out.shape[0], 3, 3)
-        stress_symmetric = 0.5 * (stress + stress.permute(0, 2, 1))
-        stress_symmetric = torch.clamp(stress_symmetric, -1e4, 1e4)
-        return stress_symmetric
+        return stress_symmetric.detach() if not torch.is_grad_enabled() else stress_symmetric
 
 
 def load_particle_mat_ids(traj_data_dir: str, num_particles: int,
@@ -250,7 +358,7 @@ def load_multi_material_latents(latent_path: str, num_materials: int,
     return trajectory_latents
 
 
-@hydra.main(config_path='configs', config_name='sim')
+@hydra.main(config_path='configs', config_name='sim_custom')
 def main(cfg: omegaconf.DictConfig):
 
     ## Logging ##
@@ -303,7 +411,10 @@ def main(cfg: omegaconf.DictConfig):
         device=device,
     )
 
-    ## Build model ##
+    use_kan    = cfg['train_cfg'].get('use_kan', False)
+    n_hidden   = OmegaConf.to_container(cfg['train_cfg']['n_hidden'], resolve=True) if use_kan else None
+    grid_range = OmegaConf.to_container(cfg['train_cfg']['grid_range'], resolve=True) if use_kan else None
+
     fproj_model = FprojNN(
         activation=cfg['train_cfg']['nn_activation'],
         hidden_size=cfg['train_cfg']['hidden_size'],
@@ -313,29 +424,49 @@ def main(cfg: omegaconf.DictConfig):
     ).to(device)
 
     stress_model = StressNN(
-        activation=cfg['train_cfg']['nn_activation'],
         hidden_size=cfg['train_cfg']['hidden_size'],
         embed_dim=cfg['train_cfg']['embed_dim'],
         device='cuda',
         trajectory_latents=None,
+        use_kan=use_kan,
+        n_hidden=n_hidden,
+        grid_range=grid_range,
+        seed=0,
     ).to(device)
 
     if cfg['train_cfg']['load_model']:
-        ckpt = torch.load(os.path.join(local_dir, cfg['train_cfg']['load_model']))
+        ckpt = torch.load(
+            os.path.join(local_dir, cfg['train_cfg']['load_model']),
+            map_location=device
+        )
+        model_state = ckpt['model_state_dict']
+
+        # Fproj: remap fc1_fproj -> fc1, etc.
+        fproj_key_map = {
+            'fc1_fproj': 'fc1',
+            'fc2_fproj': 'fc2',
+            'fc3_fproj': 'fc3',
+            'fc4_fproj': 'fc4',
+            'fc5_fproj': 'fc5',
+        }
+        ckpt_fproj = {}
+        for key, value in model_state.items():
+            if 'fproj' not in key:
+                continue
+            short_key = key.replace('fproj_model.', '')
+            for old, new in fproj_key_map.items():
+                short_key = short_key.replace(old, new)
+            ckpt_fproj[short_key] = value
+        fproj_expected = set(fproj_model.state_dict().keys())
+        ckpt_fproj = {k: v for k, v in ckpt_fproj.items() if k in fproj_expected}
+        fproj_model.load_state_dict(ckpt_fproj, strict=True)
+
+        # Stress: strip 'stress_model.' prefix
         ckpt_stress = {
-            key.replace('module.', '')
-               .replace('_stress', '')
-               .replace('stress_model.', ''): value
-            for key, value in ckpt.items() if 'stress' in key
+            key.replace('stress_model.', ''): value
+            for key, value in model_state.items() if 'stress' in key
         }
-        ckpt_fproj = {
-            key.replace('module.', '')
-               .replace('_fproj', '')
-               .replace('fproj_model.', ''): value
-            for key, value in ckpt.items() if 'fproj' in key
-        }
-        stress_model.load_state_dict(ckpt_stress)
-        fproj_model.load_state_dict(ckpt_fproj)
+        stress_model.stress_model.load_state_dict(ckpt_stress, strict=True)
 
     fproj_model.trajectory_latents = trajectory_latents
     stress_model.trajectory_latents = trajectory_latents

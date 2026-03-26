@@ -1,6 +1,6 @@
 grogu: False
-lr: 0.1
-save_dir: save_dir/elastic
+lr: 0.00005
+save_dir: save_dir/pretrg
 local_dir: /home/tanmay/thesis/UniPhy
 material_data: oracle_Data/elastic_torus_orig
 mu_init_val: 3.
@@ -23,7 +23,7 @@ particles_ti_root: 1024
 T_0: 100
 T_mult: 1
 cosine_cycles: 2000
-epochs: 2000000
+epochs: 250
 shuffle: True
 step_lr_step_size: 30
 resume: False
@@ -40,7 +40,7 @@ traj_latent_idx: None
 config_path: None
 eval_gt_nn_scenario: None
 n_hidden: [3, 2, 1]
+n_hidden_ann: 8
 grid_range: [[-5.0, 25.0], [-5.0, 25.0], [-5.0, 25.0]]
-z_dim: 6
 use_kan: False
 num_materials: 16
