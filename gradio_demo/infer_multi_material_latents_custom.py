@@ -114,17 +114,13 @@ class FprojNN(torch.nn.Module):
         self.flatten = Rearrange('b d1 d2 -> b (d1 d2)', d1=3, d2=3)
         self.device = "cuda"
 
-        # TODO: remove extra +3 AND extra layers
-        self.fc1 = nn.Linear(27 + 3 + embed_dim, hidden_size, bias=True)
+        self.fc1 = nn.Linear(27 + embed_dim, hidden_size, bias=True)
         self.fc2 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc3 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc4 = nn.Linear(hidden_size, hidden_size, bias=True)
-        self.fc5 = nn.Linear(hidden_size, 9, bias=True)
+        self.fc3 = nn.Linear(hidden_size, 9, bias=True)
 
         # trajectory_latents is now a nn.ModuleList (or None before wiring)
         self.trajectory_latents = trajectory_latents
 
-    # TODO: remove sigma stuff
     def Ftmp_U_Vt_transform(self, Ftmp, U, V):
         if (len((torch.isnan(Ftmp) == True).nonzero()) > 0 or
                 len((torch.isinf(Ftmp) == True).nonzero()) > 0):
@@ -135,7 +131,7 @@ class FprojNN(torch.nn.Module):
         Vt_flatten  = self.flatten(V.transpose(1, 2))       # P x 9
         Ftmp_flatten = self.flatten(Ftmp)                   # P x 9
         Ftmp_input  = torch.cat(
-            [Ftmp_flatten, U_flatten, sigma, Vt_flatten], dim=-1  # P x 27
+            [Ftmp_flatten, U_flatten, Vt_flatten], dim=-1  # P x 27
         )
         return Ftmp_input
 
@@ -187,14 +183,11 @@ class FprojNN(torch.nn.Module):
                     .repeat(Ftmp.shape[0], 1)
             )
 
-        # TODO: remove extra layers
         x = self.activation(
-            self.fc1(torch.cat([Ftmp_flatten, latent_particles], dim=-1))
+            self.fc1(torch.cat([Ftmp_flatten, latent_particles], dim=-1).double())
         )
         x   = self.activation(self.fc2(x))
-        x   = self.activation(self.fc3(x))
-        x   = self.activation(self.fc4(x))
-        out = self.fc5(x)
+        out = self.fc3(x)
 
         Fproj = Ftmp + out.view(out.shape[0], 3, 3)
         return Fproj
@@ -265,16 +258,17 @@ class BranchingConstitutiveStress(nn.Module):
         C11 = F01**2 + F11**2
         I1 = C00 + C11 + 1.0
         I3 = C00*C11 - C01**2
-        I3_safe = torch.clamp(I3, min=1e-6)
+        I3_safe = torch.clamp(I3, min=1e-4)
         J  = torch.sqrt(I3_safe)
         K1 = I1 * torch.pow(I3_safe, -1.0/3.0) - 3.0
         K2 = torch.pow(
             (I1 + I3_safe - 1.0) * torch.pow(I3_safe, -2.0/3.0), 1.5
         ) - 3.0 * (3.0 ** 0.5)
         K3 = (J - 1.0)**2
-        return torch.cat([K1, K2, K3], dim=1) #.double()
+        return torch.cat([K1, K2, K3], dim=1).double()
 
     def forward(self, F_flat, z):
+        z = z.double()
         K = self.compute_invariants(F_flat)
         W_elastic     = self.elastic_nn(K)
         elastic_scale = self.elastic_scale(z)

@@ -409,17 +409,19 @@ def main(cfg: omegaconf.DictConfig):
     pred_x_all_steps = pred_x_all_steps_orig[
         :, :(substep_pred * num_sim_steps + 1), :
     ].transpose(1, 0, 2)
-
     
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
+
+    np.save(os.path.join(local_dir, save_dir, "trajectory.npy"), pred_x_all_steps)
+    np.save(os.path.join(local_dir, save_dir, "material_ids.npy"), particle_mat_ids.cpu().numpy())
 
     if cfg['train_cfg']['plot_errors']:
         gt_x = traj_data_orig.cpu().numpy()  # (T, P, 3)
         num_gt_frames = gt_x.shape[0]
 
         # Sample predicted positions at frame boundaries to match GT timesteps
-        pred_at_frames = pred_x_all_steps[::substep_pred]  # (T, P, 3) approximately
+        pred_at_frames = pred_x_all_steps[::]  # (T, P, 3) approximately
         # Trim to match GT length
         min_frames = min(num_gt_frames, pred_at_frames.shape[0])
         gt_x        = gt_x[:min_frames]

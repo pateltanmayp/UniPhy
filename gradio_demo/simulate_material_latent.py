@@ -254,6 +254,26 @@ def main(cfg: omegaconf.DictConfig):
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
 
+    gt_x = traj_data_orig.cpu().numpy()  # (T, P, 3)
+    num_gt_frames = gt_x.shape[0]
+
+    # Sample predicted positions at frame boundaries to match GT timesteps
+    pred_at_frames = pred_x_all_steps[::]  # (T, P, 3) approximately
+    # Trim to match GT length
+    min_frames = min(num_gt_frames, pred_at_frames.shape[0])
+    gt_x        = gt_x[:min_frames]
+    pred_at_frames = pred_at_frames[:min_frames]
+
+    # Per-particle position error at each frame: (T, P, 3) -> mean over particles
+    error = np.linalg.norm(pred_at_frames - gt_x, axis=-1)  # (T, P)
+    mean_error_per_frame    = error.mean(axis=1)             # (T,)
+
+    # Print summary stats
+    print(f"\nPosition error summary (all particles):")
+    print(f"  Mean over all frames: {mean_error_per_frame.mean():.6f}")
+    print(f"  Max over all frames:  {mean_error_per_frame.max():.6f}")
+    print(f"  Final frame error:    {mean_error_per_frame[-1]:.6f}")
+
     gui = ti.GUI("MPM", (800, 800))
 
     for t in range(pred_x_all_steps.shape[0]):

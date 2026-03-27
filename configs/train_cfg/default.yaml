@@ -1,6 +1,6 @@
 grogu: False
-lr: 0.00005
-save_dir: save_dir/pretrg
+lr: 0.001
+save_dir: trg_save_dir/branching_high_lr_updated_network
 local_dir: /home/tanmay/thesis/UniPhy
 material_data: oracle_Data/elastic_torus_orig
 mu_init_val: 3.
