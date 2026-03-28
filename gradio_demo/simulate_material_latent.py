@@ -140,7 +140,7 @@ class StressNN(torch.nn.Module):
 
         return stress_symmetric
 
-@hydra.main(config_path='configs', config_name='sim')
+@hydra.main(config_path='configs', config_name='sim_single_material')
 def main(cfg: omegaconf.DictConfig):
 
     ## Logging ##
