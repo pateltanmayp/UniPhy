@@ -25,6 +25,6 @@ latent_idx: None
 traj_latent_idx: None
 hou_vis: False
 traj_data_dir: dataset/elastic_diverse/elastic_blobby_diagonalleft_mu100888.70292314081_lam1255517.0760980833
-plot_errors: True
-sim_materials_separately: False
-sim_materials_together: True
+plot_errors: False
+sim_materials: False
+save_sim_np: False

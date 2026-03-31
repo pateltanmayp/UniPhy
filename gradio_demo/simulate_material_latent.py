@@ -274,12 +274,12 @@ def main(cfg: omegaconf.DictConfig):
     print(f"  Max over all frames:  {mean_error_per_frame.max():.6f}")
     print(f"  Final frame error:    {mean_error_per_frame[-1]:.6f}")
 
-    gui = ti.GUI("MPM", (800, 800))
-
-    for t in range(pred_x_all_steps.shape[0]):
-        pts = pred_x_all_steps[t][:, :2]  # 2D projection
-        gui.circles(pts, radius=1)
-        gui.show()
+    if cfg['train_cfg']['sim_materials']:
+        gui = ti.GUI("MPM", (800, 800))
+        for t in range(pred_x_all_steps.shape[0]):
+            pts = pred_x_all_steps[t][:, :2]  # 2D projection
+            gui.circles(pts, radius=1)
+            gui.show()
 
     if cfg['train_cfg']['hou_vis']:
         visualize_simulation(trajectory=pred_x_all_steps)

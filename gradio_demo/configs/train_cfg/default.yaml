@@ -1,14 +1,14 @@
 cuda_chunk_size: 2900
 particles_ti_root: 500
-save_dir: None
-local_dir: None
+save_dir: gradio_save_dir/dev
+local_dir: /home/tanmay/thesis/UniPhy
 dataset_dir: None
 camera_json_path: None
 image_dir: None
 nn_activation: gelu
 hidden_size: 4096
 embed_dim: 1024
-load_model: None
+load_model: ckpt/pretrained_stress_fproj_models_latent_space/ckpt.pth
 traj_latent_path: None
 batch_size: 32
 lr: 1e-4

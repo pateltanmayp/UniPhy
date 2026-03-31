@@ -413,8 +413,9 @@ def main(cfg: omegaconf.DictConfig):
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
 
-    np.save(os.path.join(local_dir, save_dir, "trajectory.npy"), pred_x_all_steps)
-    np.save(os.path.join(local_dir, save_dir, "material_ids.npy"), particle_mat_ids.cpu().numpy())
+    if cfg['train_cfg']['save_sim_np']:
+        np.save(os.path.join(local_dir, save_dir, "trajectory.npy"), pred_x_all_steps)
+        np.save(os.path.join(local_dir, save_dir, "material_ids.npy"), particle_mat_ids.cpu().numpy())
 
     if cfg['train_cfg']['plot_errors']:
         gt_x = traj_data_orig.cpu().numpy()  # (T, P, 3)
@@ -513,9 +514,13 @@ def main(cfg: omegaconf.DictConfig):
 
     if cfg['train_cfg']['sim_materials_together']:
         gui = ti.GUI("Simulation", (800, 800))
+        view_range = 0.5
+
         for t in range(pred_x_all_steps.shape[0]):
             pts = pred_x_all_steps[t][:, :2]
-            gui.circles(pts, radius=1)
+            # Shift so (0,0) -> (0.5, 0.5), then scale to fit in [0,1]
+            pts_screen = pts / (2 * view_range) + 0.5
+            gui.circles(pts_screen, radius=1)
             gui.show()
 
     if cfg['train_cfg']['hou_vis']:

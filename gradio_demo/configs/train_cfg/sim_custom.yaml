@@ -33,3 +33,4 @@ grid_range: [[-5.0, 25.0], [-5.0, 25.0], [-5.0, 25.0]]
 plot_errors: True
 sim_materials_separately: False
 sim_materials_together: True
+save_sim_np: True

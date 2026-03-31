@@ -34,9 +34,9 @@ def main():
         s=5
     )
 
-    ax.set_xlim([x_gt[:,:,0].min().item(), x_gt[:,:,0].max().item()])
-    ax.set_ylim([x_gt[:,:,1].min().item(), x_gt[:,:,1].max().item()])
-    ax.set_zlim([x_gt[:,:,2].min().item(), x_gt[:,:,2].max().item()])
+    ax.set_xlim([-0.2, 0.2])
+    ax.set_ylim([0, 0.4])
+    ax.set_zlim([-0.2, 0.2])
 
     def update(frame):
         scatter._offsets3d = (

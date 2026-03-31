@@ -28,3 +28,4 @@ traj_data_dir: dataset/interacting_diverse/diverse_horizontalright_mu2030533.547
 plot_errors: True
 sim_materials_separately: False
 sim_materials_together: True
+save_sim_np: True

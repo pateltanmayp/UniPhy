@@ -538,8 +538,9 @@ def main(cfg: omegaconf.DictConfig):
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
 
-    np.save(os.path.join(local_dir, save_dir, "trajectory.npy"), pred_x_all_steps)
-    np.save(os.path.join(local_dir, save_dir, "material_ids.npy"), particle_mat_ids.cpu().numpy())
+    if cfg['train_cfg']['save_sim_np']:
+        np.save(os.path.join(local_dir, save_dir, "trajectory.npy"), pred_x_all_steps)
+        np.save(os.path.join(local_dir, save_dir, "material_ids.npy"), particle_mat_ids.cpu().numpy())
 
     if cfg['train_cfg']['plot_errors']:
         gt_x = traj_data_orig.cpu().numpy()  # (T, P, 3)
