@@ -212,3 +212,6 @@ dmypy.json
 /save_dir/
 /trg_save_dir/
 /gradio_save_dir/dev/
+
+*.out
+certificate.pem
