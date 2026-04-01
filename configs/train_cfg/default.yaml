@@ -1,6 +1,6 @@
 grogu: False
-lr: 0.001
-save_dir: trg_save_dir/branching_high_lr_updated_network
+lr: 0.0002
+save_dir: trg_save_dir/branching_network_v3
 local_dir: /home/tanmay/thesis/UniPhy
 material_data: oracle_Data/elastic_torus_orig
 mu_init_val: 3.
@@ -27,7 +27,7 @@ epochs: 250
 shuffle: True
 step_lr_step_size: 30
 resume: False
-embed_dim: 128
+embed_dim: 1024
 traj_latent_path: None
 gt_X_file: None
 discount_factor: 0.9
